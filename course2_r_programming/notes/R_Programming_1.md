@@ -3,4 +3,4 @@
 1. Atomic data types
 integer, numeric, complex, 
 
-2. 
+2.  

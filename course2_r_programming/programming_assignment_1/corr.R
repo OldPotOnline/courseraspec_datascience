@@ -12,13 +12,17 @@ corr <- function(directory, threshold = 0) {
   source("complete.R")
   completeTable <- complete("specdata")
   
-  remainedTable <- completeTable[(with(completeTable, completeTable$nobs > threshold)),]
-  
+  remainedTable <- completeTable[(with(completeTable, completeTable$nobs >= threshold)),]
+
   fileName <- paste(directory, "/", formatC(1:332, width=3, flag="0"), ".csv", sep="")
   raw_data <- lapply(fileName, read.csv)
   
   selectedData <- raw_data[remainedTable$id]
-  raw_result <- lapply(1:length(selectedData), function(x) cor(selectedData[[x]]$sulfate, selectedData[[x]]$nitrate, use = "na.or.complete"))
-   result <- ldply(raw_result)
-  return(result$V1)
+  if(length(selectedData) > 0) {
+    raw_result <- lapply(1:length(selectedData), function(x) cor(selectedData[[x]]$sulfate, selectedData[[x]]$nitrate, use = "na.or.complete"))
+    result <- ldply(raw_result)
+    return(result$V1)
+  } else {
+    return()
+  } 
 }

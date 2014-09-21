@@ -1,0 +1,179 @@
+---
+title: "Reproducible Research, Peer Assignment 2 - Storm Data Analysis"
+output: html_document
+---
+
+#### 1. Synopsis
+
+Many natural events, such as storms, flood, tornado, will have unprediciable impact on both public health and economics. They may result in fatalities, injureis and also property damage.  
+
+The U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database will be used in this project. This database tracks characteristics of major storms and weather events in the United States, including but not limited to when and where they occur, as well as estimates of any fatalities, injuries, and property damage.  
+
+The two major questions will be answered in this documnet are:  
+1. Across the United States, which types of events  are most harmful with respect to population health, more specifically fatalities and injuries?  
+
+2. Across the United States, which types of events have the greatest economic consequences?  
+
+#### 2. Data Processing
+
+##### 2.1 Download data
+
+Data is downloaded from [Storm Data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2)  
+Storm Data is an official publication of the National Oceanic and Atmospheric Administration (NOAA). The events in the database start in the year 1950 and end in November 2511. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.  
+
+##### 2.2 Install and load packages
+
+``` {r}
+## If the pakcage doesn't exist, using: install.packages('data.table') 
+## This package is used for processing the data file
+library(data.table)
+## If the pakcage doesn't exist, using: install.packages('ggplot2') 
+## This package is used for plotting result
+library(ggplot2)
+```
+
+Download and uncompress the data, the load data in to R.
+```{r, echo=FALSE}
+dataDir <- "/Users/tingliangguo/repos/github/data/ReprodResearch_Assessment2/"
+```
+```{r, cache = TRUE}
+data <- read.csv(paste(dataDir, "repdata-data-StormData.csv", sep = ""))
+```
+
+##### 2.3 Basic Data Info
+Structure of the data
+```{r, echo=TRUE}
+str(data)
+```
+
+Summary of the data
+```{r, echo=TRUE}
+head(data)
+```
+
+##### 2.4 Data Clearning and Pre-processing
+Convert fatalities and injuries into numerical values
+```{r}
+data$FATALITIES <- as.numeric(data$FATALITIES)
+data$INJURIES <- as.numeric(data$INJURIES)
+```
+
+Convert event type into factor
+```{r}
+data$EVTYPE <- as.factor(data$EVTYPE)
+```
+
+#### 3. Result  
+
+##### 3.1 The most harmful events result in fatalities  
+
+Read the data into data.table:  
+```{r echo = TRUE}
+fatalities <- as.data.table(subset(aggregate(FATALITIES ~ EVTYPE, data = data, 
+                                             FUN = "sum"), FATALITIES > 0))
+```
+
+Select the top 25 events and reorder the factor level:  
+```{r, echo=TRUE}
+fatalities <- fatalities[order(-FATALITIES), ]
+fatalities$EVTYPE <- reorder(fatalities$EVTYPE, fatalities$FATALITIES)
+top25 <- fatalities[1:25, ] 
+```
+Plot the top 25 events causing fatalities:
+```{r echo = TRUE}
+ggplot(data = top25, aes(ymin=0, ymax=FATALITIES+FATALITIES * 0.1,
+                         x=EVTYPE, y=FATALITIES, fill = FATALITIES) ) + 
+    geom_bar(stat = "identity") + 
+    xlab("Events") + 
+    ylab("Fatalities") + 
+    ggtitle("Fatalities caused by Events (top 25) ") + 
+    coord_flip() +
+    geom_text(size=3.5, aes(label=FATALITIES),  
+              position = position_dodge(width=0.1), hjust = -0.1)
+```
+
+As shown in the plot above, tornado is the most harmful event which causes fatalities.
+
+##### 3.2 The most harmful events result in injuries  
+Read the data into data.table:   
+```{r, echo=TRUE}
+library(data.table)
+injuries <- as.data.table(subset(aggregate(INJURIES ~ EVTYPE, data = data, 
+                                           FUN = "sum"), INJURIES > 0))
+```
+
+Select the top 25 events and reorder the factor level:
+```{r, echo=TRUE}
+injuries <- injuries[order(-INJURIES), ]
+injuries$EVTYPE <- reorder(injuries$EVTYPE, injuries$INJURIES)
+top25 <- injuries[1:25, ] 
+```
+
+Plot the top 25 events causing injuries:
+```{r, echo=TRUE}
+ggplot(data = top25, aes(ymin=0, ymax=INJURIES+INJURIES * 0.1, 
+                         x=EVTYPE, y=INJURIES, fill = INJURIES)) + 
+    geom_bar(stat = "identity") + 
+    xlab("Events") + 
+    ylab("Injuries") + 
+    ggtitle("Injuries caused by Events (top 25) ") + 
+    coord_flip() +
+    geom_text(size=3.5, aes(label=INJURIES),  
+              position = position_dodge(width=0.1), hjust = -0.1)
+```  
+
+As shown in the plot above, tornado is the most harmful event which causes injuries as well.
+
+##### 3.3 The most harmful events result in property damanges  
+
+Read the data and calculat the economic cost using data$PROPDMG and data$PROPDMGEXP:
+```{r, echo=TRUE}
+data$PROPDMGEXP <- toupper(data$PROPDMGEXP)
+
+calcExp <- function(x, exp = "") {
+    switch(exp, 
+           `1` = x, `2` = x * (10^2), `3` = x * (10^3), 
+           `4` = x * (10^4), `5` = x * (10^5), `6` = x * (10^6), 
+           `7` = x * (10^7), `8` = x * (10^8), 
+           H = x * 100, K = x * 1000, 
+           M = x * 1e+06, B = x * 1e+09, 
+           `-` = x * -1, `?` = x, `+` = x, 
+           x)
+}
+
+applyCalcExp <- function(vx, vexp) {
+    if (length(vx) != length(vexp)) 
+        stop("Not same size")
+    result <- rep(0, length(vx))
+    for (i in 1:length(vx)) {
+        result[i] <- calcExp(vx[i], vexp[i])
+    }
+    result
+}
+
+data$EconomicCosts <- applyCalcExp(as.numeric(data$PROPDMG), data$PROPDMGEXP)
+```
+
+Select the top 25 events and reorder the factor level:  
+```{r, echo=TRUE}
+cost <- as.data.table(subset(aggregate(EconomicCosts ~ EVTYPE, data = data, 
+                                           FUN = "sum"), EconomicCosts > 0))
+cost <- cost[order(-EconomicCosts), ]
+cost$EVTYPE <- reorder(cost$EVTYPE, cost$EconomicCosts)
+top25 <- cost[1:25, ] 
+```
+
+Plot the top 25 events causing most economic cost:  
+```{r, echo=TRUE}
+ggplot(data = top25, aes(ymin=0, ymax=EconomicCosts + EconomicCosts * 0.4,
+                         x=EVTYPE, y=EconomicCosts, fill = EconomicCosts)) + 
+    geom_bar(stat = "identity") + 
+    xlab("Events") + 
+    ylab("Economic Cost") + 
+    ggtitle("Economic cost caused by Events (top 25) ") + 
+    coord_flip() +
+    geom_text(size=3.5, aes(label=format(EconomicCosts, scientific=TRUE)),  
+              position = position_dodge(width=0.1), hjust = -0.1)
+```
+As shown in the plot above, flood is the most harmful event which results in most economic cost.
+

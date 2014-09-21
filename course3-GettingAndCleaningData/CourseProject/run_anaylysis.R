@@ -36,10 +36,8 @@ for (currActLbl in activity_labels$V2) {
     currAct <- currAct + 1
 }
 
-
 allData$activity <- as.factor(allData$activity)
 allData$subject <- as.factor(allData$subject)
-
 
 tidy = aggregate(allData[1:7], by=list(activity = allData$activity, subject=allData$subject), mean)
 # Remove the subject and activity column, since a mean of those has no use

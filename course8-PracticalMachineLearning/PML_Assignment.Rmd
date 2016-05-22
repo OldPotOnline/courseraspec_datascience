@@ -1,0 +1,120 @@
+---
+title: "Practial Maching Learning Assignment"
+output: pdf_document
+---
+## Project Description
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+## Overview
+This report is the final assignment of Practical Machine Learning in Coursera. In this project, the goal is to analyze data from "Weight Lifting Exercises Dataset” and predict the manner in which participants did the exercise. This prediction model will be used to predict 20 different test cases in the final testing dataset.
+
+## Data Clean 
+### 1. Preparation
+Loading necessary R packages
+```{r message=FALSE}
+library(caret)
+library(randomForest)
+library(corrplot)
+library(rattle)
+library(rpart)
+```
+
+### 2. Data Cleaning
+- Data set is downloaded from the following URL
+```{r}
+URL_TrainingFile <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+URL_TestingFile  <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+```
+
+- Loading data from csv file
+```{r}
+trainRaw <- read.csv("./data/pml-training.csv", na.strings=c("", "NA", "NULL"))
+dim(trainRaw)
+```
+
+- Remove NA variables
+```{r}
+tr.notnan<- trainRaw[ , colSums(is.na(trainRaw)) == 0]
+remove = c('X', 'user_name', 'raw_timestamp_part_1', 'raw_timestamp_part_2', 'cvtd_timestamp', 'new_window', 'num_window')
+tr.core <- tr.notnan[, -which(names(tr.notnan) %in% remove)]
+dim(tr.core)
+```
+
+
+- Remove variables with near zero variance variables
+```{r}
+zeroVar= nearZeroVar(tr.core[sapply(tr.core, is.numeric)], saveMetrics = TRUE)
+tr.nonzero = tr.core[,zeroVar[, 'nzv']==0]
+dim(tr.nonzero)
+```
+
+- Remove highly correlated variables (90%).
+```{r}
+corrMatrix <- cor(na.omit(tr.nonzero[sapply(tr.nonzero, is.numeric)]))
+dim(corrMatrix)
+
+removecor = findCorrelation(corrMatrix, cutoff = .90, verbose = TRUE)
+tr.decor = tr.nonzero[,-removecor]
+dim(tr.decor)
+
+```
+
+- Split data into training and testing for cross validation
+```{r}
+inTrain <- createDataPartition(tr.decor$classe, p=0.7, list=F)
+training <- tr.decor[inTrain,]
+testing <- tr.decor[-inTrain,]
+```
+
+## Model 1  - Decision Tree
+```{r warning=FALSE} 
+set.seed(12345)
+rf.decTree_training <- rpart(classe ~ ., data=training, method="class")
+fancyRpartPlot(rf.decTree_training, sub="Descision Tree")
+```
+
+Out of sampel accuracy for decision tree model
+```{r}
+predicted_desTree <- predict(rf.decTree_training, newdata=testing, type="class")
+confMat_desTree <- confusionMatrix(predicted_desTree, testing$classe)
+confMat_desTree
+confMat_desTree$overall["Accuracy"]
+```
+
+
+## Model 2 - Random Forest
+```{r}
+rf.randomForest_training=randomForest(classe~.,data=training,ntree=100, importance=TRUE)
+rf.randomForest_training
+```
+
+Out of sampel accuracy for random forest model
+```{r}
+predicted_rf <- predict(rf.randomForest_training, newdata=testing, type="class")
+confMat_rf <- confusionMatrix(predicted_rf, testing$classe)
+confMat_rf
+confMat_rf$overall["Accuracy"]
+```
+
+## Predicting Results
+
+The accuracy of the two modeling methods shown above are:
+
+Decision Tree : `r confMat_desTree$overall["Accuracy"]`  
+Random Forest : `r confMat_rf$overall["Accuracy"]`
+
+Therefore, we are using Random Forest as the final model to predict results in testing dataset:  
+
+- Loading testing dataset
+```{r}
+testingDataset <- read.csv("./data/pml-testing.csv", na.strings=c("", "NA", "NULL"))
+dim(testingDataset)
+```
+
+- Predicting results
+```{r}
+answers <- predict(rf.randomForest_training, testingDataset)
+answers
+```
+
+
